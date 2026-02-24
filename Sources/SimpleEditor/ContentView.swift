@@ -1,0 +1,246 @@
+import SwiftUI
+import AppKit
+
+struct ContentView: View {
+    @State private var documents: [EditorDocument] = [EditorDocument()]
+    @State private var selectedTabID: UUID?
+
+    private var selectedDocument: EditorDocument? {
+        documents.first { $0.id == selectedTabID }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            tabBar
+            Divider()
+            editorArea
+        }
+        .frame(minWidth: 600, minHeight: 400)
+        .onAppear {
+            if selectedTabID == nil {
+                selectedTabID = documents.first?.id
+            }
+        }
+        .background(
+            KeyboardShortcuts(
+                onNewTab: newTab,
+                onOpen: openFile,
+                onSave: saveFile,
+                onSaveAs: saveFileAs,
+                onCloseTab: closeCurrentTab
+            )
+        )
+    }
+
+    // MARK: - Tab Bar
+
+    private var tabBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 0) {
+                ForEach(documents) { doc in
+                    tabItem(for: doc)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 4)
+        }
+        .frame(height: 32)
+        .background(Color(nsColor: .controlBackgroundColor))
+    }
+
+    private func tabItem(for doc: EditorDocument) -> some View {
+        HStack(spacing: 4) {
+            Text(doc.displayTitle)
+                .font(.system(size: 12))
+                .lineLimit(1)
+
+            Button(action: { closeTab(doc) }) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundColor(.secondary)
+            }
+            .buttonStyle(.plain)
+            .frame(width: 14, height: 14)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 4)
+                .fill(selectedTabID == doc.id
+                    ? Color(nsColor: .selectedContentBackgroundColor).opacity(0.3)
+                    : Color.clear)
+        )
+        .onTapGesture {
+            selectedTabID = doc.id
+        }
+    }
+
+    // MARK: - Editor Area
+
+    private var editorArea: some View {
+        Group {
+            if let doc = selectedDocument {
+                EditorTextView(document: doc)
+            } else {
+                Text("No document open")
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+    }
+
+    // MARK: - Actions
+
+    private func newTab() {
+        let doc = EditorDocument()
+        documents.append(doc)
+        selectedTabID = doc.id
+    }
+
+    private func openFile() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.allowedContentTypes = [.plainText, .sourceCode, .data]
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        let doc = EditorDocument()
+        do {
+            try doc.load(from: url)
+            documents.append(doc)
+            selectedTabID = doc.id
+        } catch {
+            showError("Failed to open file: \(error.localizedDescription)")
+        }
+    }
+
+    private func saveFile() {
+        guard let doc = selectedDocument else { return }
+        if doc.fileURL != nil {
+            do {
+                try doc.save()
+            } catch {
+                showError("Failed to save: \(error.localizedDescription)")
+            }
+        } else {
+            saveFileAs()
+        }
+    }
+
+    private func saveFileAs() {
+        guard let doc = selectedDocument else { return }
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = doc.title
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        do {
+            try doc.save(to: url)
+        } catch {
+            showError("Failed to save: \(error.localizedDescription)")
+        }
+    }
+
+    private func closeTab(_ doc: EditorDocument) {
+        guard let index = documents.firstIndex(where: { $0.id == doc.id }) else { return }
+        let wasSelected = selectedTabID == doc.id
+        documents.remove(at: index)
+
+        if wasSelected {
+            if documents.isEmpty {
+                newTab()
+            } else {
+                let newIndex = min(index, documents.count - 1)
+                selectedTabID = documents[newIndex].id
+            }
+        }
+    }
+
+    private func closeCurrentTab() {
+        guard let doc = selectedDocument else { return }
+        closeTab(doc)
+    }
+
+    private func showError(_ message: String) {
+        let alert = NSAlert()
+        alert.messageText = "Error"
+        alert.informativeText = message
+        alert.alertStyle = .warning
+        alert.runModal()
+    }
+}
+
+// MARK: - TextEditor Wrapper
+
+struct EditorTextView: View {
+    @ObservedObject var document: EditorDocument
+
+    var body: some View {
+        TextEditor(text: $document.content)
+            .font(.system(.body, design: .monospaced))
+            .scrollContentBackground(.visible)
+    }
+}
+
+// MARK: - Keyboard Shortcuts (invisible background view)
+
+struct KeyboardShortcuts: NSViewRepresentable {
+    var onNewTab: () -> Void
+    var onOpen: () -> Void
+    var onSave: () -> Void
+    var onSaveAs: () -> Void
+    var onCloseTab: () -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = ShortcutView()
+        view.onNewTab = onNewTab
+        view.onOpen = onOpen
+        view.onSave = onSave
+        view.onSaveAs = onSaveAs
+        view.onCloseTab = onCloseTab
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        guard let view = nsView as? ShortcutView else { return }
+        view.onNewTab = onNewTab
+        view.onOpen = onOpen
+        view.onSave = onSave
+        view.onSaveAs = onSaveAs
+        view.onCloseTab = onCloseTab
+    }
+
+    class ShortcutView: NSView {
+        var onNewTab: (() -> Void)?
+        var onOpen: (() -> Void)?
+        var onSave: (() -> Void)?
+        var onSaveAs: (() -> Void)?
+        var onCloseTab: (() -> Void)?
+
+        override var acceptsFirstResponder: Bool { true }
+
+        override func keyDown(with event: NSEvent) {
+            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            let cmd = NSEvent.ModifierFlags.command
+            let cmdShift: NSEvent.ModifierFlags = [.command, .shift]
+
+            if flags == cmd {
+                switch event.charactersIgnoringModifiers {
+                case "n": onNewTab?(); return
+                case "o": onOpen?(); return
+                case "s": onSave?(); return
+                case "w": onCloseTab?(); return
+                default: break
+                }
+            } else if flags == cmdShift {
+                switch event.charactersIgnoringModifiers?.lowercased() {
+                case "s": onSaveAs?(); return
+                default: break
+                }
+            }
+
+            super.keyDown(with: event)
+        }
+    }
+}
