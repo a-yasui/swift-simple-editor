@@ -43,12 +43,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var keyMonitor: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
             let optShift: NSEvent.ModifierFlags = [.option, .shift]
 
-            // Opt+Shift+= (the "+" key without numpad)
-            if flags == optShift && event.charactersIgnoringModifiers == "=" {
+            // Opt+Shift+= (charactersIgnoringModifiers keeps Shift, so "=" becomes "+")
+            if flags.contains(optShift) && (event.charactersIgnoringModifiers == "+" || event.charactersIgnoringModifiers == "=") {
                 WindowToggleManager.shared.toggle()
                 return nil
             }
