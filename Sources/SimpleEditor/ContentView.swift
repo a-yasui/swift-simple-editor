@@ -4,6 +4,7 @@ import AppKit
 struct ContentView: View {
     @State private var documents: [EditorDocument] = [EditorDocument()]
     @State private var selectedTabID: UUID?
+    @State private var saveDirectory: URL?
 
     private var selectedDocument: EditorDocument? {
         documents.first { $0.id == selectedTabID }
@@ -24,7 +25,7 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .newTab)) { _ in newTab() }
         .onReceive(NotificationCenter.default.publisher(for: .openFile)) { _ in openFile() }
         .onReceive(NotificationCenter.default.publisher(for: .saveFile)) { _ in saveFile() }
-        .onReceive(NotificationCenter.default.publisher(for: .saveFileAs)) { _ in saveFileAs() }
+        .onReceive(NotificationCenter.default.publisher(for: .saveAllToDirectory)) { _ in saveAllToDirectory() }
         .onReceive(NotificationCenter.default.publisher(for: .closeTab)) { _ in closeCurrentTab() }
     }
 
@@ -120,21 +121,53 @@ struct ContentView: View {
                 showError("Failed to save: \(error.localizedDescription)")
             }
         } else {
-            saveFileAs()
+            let panel = NSSavePanel()
+            panel.nameFieldStringValue = doc.title
+            guard panel.runModal() == .OK, let url = panel.url else { return }
+            do {
+                try doc.save(to: url)
+            } catch {
+                showError("Failed to save: \(error.localizedDescription)")
+            }
         }
     }
 
-    private func saveFileAs() {
-        guard let doc = selectedDocument else { return }
-        let panel = NSSavePanel()
-        panel.nameFieldStringValue = doc.title
+    private func saveAllToDirectory() {
+        let directory: URL
+        if let saved = saveDirectory {
+            directory = saved
+        } else {
+            let panel = NSOpenPanel()
+            panel.canChooseFiles = false
+            panel.canChooseDirectories = true
+            panel.allowsMultipleSelection = false
+            panel.prompt = "Select"
+            panel.message = "Choose a directory to save all tabs"
 
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+            guard panel.runModal() == .OK, let url = panel.url else { return }
+            saveDirectory = url
+            directory = url
+        }
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let dateDir = directory.appendingPathComponent(formatter.string(from: Date()))
 
         do {
-            try doc.save(to: url)
+            try FileManager.default.createDirectory(at: dateDir, withIntermediateDirectories: true)
         } catch {
-            showError("Failed to save: \(error.localizedDescription)")
+            showError("Failed to create directory: \(error.localizedDescription)")
+            return
+        }
+
+        for doc in documents {
+            let fileName = doc.fileURL?.lastPathComponent ?? doc.title
+            let fileURL = dateDir.appendingPathComponent(fileName)
+            do {
+                try doc.save(to: fileURL)
+            } catch {
+                showError("Failed to save \(fileName): \(error.localizedDescription)")
+            }
         }
     }
 
