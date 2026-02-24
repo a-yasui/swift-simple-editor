@@ -27,6 +27,8 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .saveFile)) { _ in saveFile() }
         .onReceive(NotificationCenter.default.publisher(for: .saveAllToDirectory)) { _ in saveAllToDirectory() }
         .onReceive(NotificationCenter.default.publisher(for: .closeTab)) { _ in closeCurrentTab() }
+        .onReceive(NotificationCenter.default.publisher(for: .previousTab)) { _ in switchTab(offset: -1) }
+        .onReceive(NotificationCenter.default.publisher(for: .nextTab)) { _ in switchTab(offset: 1) }
     }
 
     // MARK: - Tab Bar
@@ -184,6 +186,13 @@ struct ContentView: View {
                 selectedTabID = documents[newIndex].id
             }
         }
+    }
+
+    private func switchTab(offset: Int) {
+        guard documents.count > 1,
+              let currentIndex = documents.firstIndex(where: { $0.id == selectedTabID }) else { return }
+        let newIndex = (currentIndex + offset + documents.count) % documents.count
+        selectedTabID = documents[newIndex].id
     }
 
     private func closeCurrentTab() {

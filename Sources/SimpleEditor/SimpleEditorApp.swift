@@ -27,6 +27,18 @@ struct SimpleEditorApp: App {
                     NotificationCenter.default.post(name: .closeTab, object: nil)
                 }
                 .keyboardShortcut("w", modifiers: .command)
+
+                Divider()
+
+                Button("Previous Tab") {
+                    NotificationCenter.default.post(name: .previousTab, object: nil)
+                }
+                .keyboardShortcut("[", modifiers: [.command, .shift])
+
+                Button("Next Tab") {
+                    NotificationCenter.default.post(name: .nextTab, object: nil)
+                }
+                .keyboardShortcut("]", modifiers: [.command, .shift])
             }
 
             CommandGroup(replacing: .saveItem) {
@@ -85,4 +97,6 @@ extension Notification.Name {
     static let saveFile = Notification.Name("saveFile")
     static let saveAllToDirectory = Notification.Name("saveAllToDirectory")
     static let closeTab = Notification.Name("closeTab")
+    static let previousTab = Notification.Name("previousTab")
+    static let nextTab = Notification.Name("nextTab")
 }
