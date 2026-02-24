@@ -35,8 +35,8 @@ struct SimpleEditorApp: App {
                 }
                 .keyboardShortcut("s", modifiers: .command)
 
-                Button("Save As...") {
-                    NotificationCenter.default.post(name: .saveFileAs, object: nil)
+                Button("Save All to Directory...") {
+                    NotificationCenter.default.post(name: .saveAllToDirectory, object: nil)
                 }
                 .keyboardShortcut("s", modifiers: [.command, .shift])
             }
@@ -83,6 +83,6 @@ extension Notification.Name {
     static let newTab = Notification.Name("newTab")
     static let openFile = Notification.Name("openFile")
     static let saveFile = Notification.Name("saveFile")
-    static let saveFileAs = Notification.Name("saveFileAs")
+    static let saveAllToDirectory = Notification.Name("saveAllToDirectory")
     static let closeTab = Notification.Name("closeTab")
 }
