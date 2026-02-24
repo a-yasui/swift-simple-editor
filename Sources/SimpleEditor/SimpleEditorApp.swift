@@ -22,6 +22,13 @@ struct SimpleEditorApp: App {
                 .keyboardShortcut("o", modifiers: .command)
             }
 
+            CommandGroup(replacing: .undoRedo) {
+                Button("Close Tab") {
+                    NotificationCenter.default.post(name: .closeTab, object: nil)
+                }
+                .keyboardShortcut("w", modifiers: .command)
+            }
+
             CommandGroup(replacing: .saveItem) {
                 Button("Save") {
                     NotificationCenter.default.post(name: .saveFile, object: nil)
@@ -77,4 +84,5 @@ extension Notification.Name {
     static let openFile = Notification.Name("openFile")
     static let saveFile = Notification.Name("saveFile")
     static let saveFileAs = Notification.Name("saveFileAs")
+    static let closeTab = Notification.Name("closeTab")
 }

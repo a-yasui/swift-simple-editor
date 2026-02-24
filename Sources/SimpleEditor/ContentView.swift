@@ -21,15 +21,11 @@ struct ContentView: View {
                 selectedTabID = documents.first?.id
             }
         }
-        .background(
-            KeyboardShortcuts(
-                onNewTab: newTab,
-                onOpen: openFile,
-                onSave: saveFile,
-                onSaveAs: saveFileAs,
-                onCloseTab: closeCurrentTab
-            )
-        )
+        .onReceive(NotificationCenter.default.publisher(for: .newTab)) { _ in newTab() }
+        .onReceive(NotificationCenter.default.publisher(for: .openFile)) { _ in openFile() }
+        .onReceive(NotificationCenter.default.publisher(for: .saveFile)) { _ in saveFile() }
+        .onReceive(NotificationCenter.default.publisher(for: .saveFileAs)) { _ in saveFileAs() }
+        .onReceive(NotificationCenter.default.publisher(for: .closeTab)) { _ in closeCurrentTab() }
     }
 
     // MARK: - Tab Bar
@@ -183,64 +179,3 @@ struct EditorTextView: View {
     }
 }
 
-// MARK: - Keyboard Shortcuts (invisible background view)
-
-struct KeyboardShortcuts: NSViewRepresentable {
-    var onNewTab: () -> Void
-    var onOpen: () -> Void
-    var onSave: () -> Void
-    var onSaveAs: () -> Void
-    var onCloseTab: () -> Void
-
-    func makeNSView(context: Context) -> NSView {
-        let view = ShortcutView()
-        view.onNewTab = onNewTab
-        view.onOpen = onOpen
-        view.onSave = onSave
-        view.onSaveAs = onSaveAs
-        view.onCloseTab = onCloseTab
-        return view
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {
-        guard let view = nsView as? ShortcutView else { return }
-        view.onNewTab = onNewTab
-        view.onOpen = onOpen
-        view.onSave = onSave
-        view.onSaveAs = onSaveAs
-        view.onCloseTab = onCloseTab
-    }
-
-    class ShortcutView: NSView {
-        var onNewTab: (() -> Void)?
-        var onOpen: (() -> Void)?
-        var onSave: (() -> Void)?
-        var onSaveAs: (() -> Void)?
-        var onCloseTab: (() -> Void)?
-
-        override var acceptsFirstResponder: Bool { true }
-
-        override func keyDown(with event: NSEvent) {
-            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-            let cmd = NSEvent.ModifierFlags.command
-            let cmdShift: NSEvent.ModifierFlags = [.command, .shift]
-
-            if flags == cmd {
-                switch event.charactersIgnoringModifiers {
-                case "n": onNewTab?(); return
-                case "o": onOpen?(); return
-                case "s": onSave?(); return
-                case "w": onCloseTab?(); return
-                default: break
-                }
-            } else if flags == cmdShift {
-                switch event.charactersIgnoringModifiers?.lowercased() {
-                case "s": onSaveAs?(); return
-                default: break
-                }
-            }
-
-            super.keyDown(with: event)
-        }
-    }
-}
