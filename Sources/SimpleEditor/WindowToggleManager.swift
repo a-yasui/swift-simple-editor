@@ -9,14 +9,15 @@ final class WindowToggleManager {
     private init() {}
 
     func toggle() {
-        guard let window = NSApplication.shared.mainWindow ?? NSApplication.shared.windows.first(where: { $0.isVisible }) else {
+        guard let appDelegate = NSApp.delegate as? AppDelegate,
+              let panel = appDelegate.panel else {
             return
         }
 
         if isOffScreen {
-            restore(window: window)
+            restore(window: panel)
         } else {
-            stash(window: window)
+            stash(window: panel)
         }
     }
 
